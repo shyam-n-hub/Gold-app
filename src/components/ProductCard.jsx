@@ -1,29 +1,31 @@
 // ============================================
-// Product Card Component
+// Product Card Component (Gold + Silver)
 // ============================================
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { FiPlus } from 'react-icons/fi';
 import { IoDiamondOutline } from 'react-icons/io5';
 import { useCart } from '../context/CartContext';
-import { calculateJewelryPrice } from '../services/goldRateService';
+import { calculateJewelryPrice, getProductRate } from '../services/goldRateService';
 import '../styles/ProductCard.css';
 
-export default function ProductCard({ product, goldRates }) {
+export default function ProductCard({ product, goldRates, silverRates }) {
     const { addToCart } = useCart();
 
-    // Calculate price based on live gold rate
-    const goldRate = product.goldType === '24K'
-        ? (goldRates?.['24k'] || 0)
-        : (goldRates?.['22k'] || 0);
+    const metalRate = getProductRate(product, goldRates, silverRates);
 
     const calculatedPrice = calculateJewelryPrice(
-        goldRate,
+        metalRate,
         product.weightInGrams || 0,
         product.wastageInGrams || 0,
         product.makingCharge || 0,
         product.taxPercentage || 0
     );
+
+    const isGold = product.metalType !== 'silver';
+    const purityLabel = isGold
+        ? (product.goldType || '22K')
+        : (product.silverPurity === '999' ? '999 Fine' : '925 Sterling');
 
     const handleAddToCart = (e) => {
         e.preventDefault();
@@ -41,14 +43,16 @@ export default function ProductCard({ product, goldRates }) {
                         <IoDiamondOutline />
                     </div>
                 )}
-                <span className="badge badge-gold gold-badge">{product.goldType}</span>
+                <span className={`badge ${isGold ? 'badge-gold' : 'badge-silver'} gold-badge`}>
+                    {isGold ? '🥇 Gold' : '🥈 Silver'}
+                </span>
             </div>
 
             <div className="product-card-body">
                 <span className="category-label">{product.category}</span>
                 <h3>{product.name}</h3>
                 <span className="weight-info">
-                    {product.weightInGrams}g • {product.goldType}
+                    {product.weightInGrams}g • {purityLabel}
                 </span>
 
                 <div className="product-card-footer">

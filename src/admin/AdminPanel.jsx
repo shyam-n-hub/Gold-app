@@ -8,18 +8,21 @@ import { GiGoldBar } from 'react-icons/gi';
 import { addProduct, getAllProducts, updateProduct, deleteProduct } from '../services/productService';
 import { getAllOrders, updateOrderStatus } from '../services/orderService';
 import { uploadImageToImgbb } from '../services/imgbbService';
-import { getStoredGoldRates, setManualGoldRates } from '../services/goldRateService';
+import { getStoredGoldRates, setManualGoldRates, getStoredSilverRates, setManualSilverRates } from '../services/goldRateService';
 import { getAllSellRequests, updateSellRequestStatus } from '../services/sellGoldService';
 import toast from 'react-hot-toast';
 import '../styles/Admin.css';
 
-const CATEGORIES = ['ring', 'chain', 'necklace', 'bangle', 'earring', 'pendant', 'bracelet'];
+const CATEGORIES = ['ring', 'chain', 'necklace', 'bangle', 'earring', 'pendant', 'bracelet', 'others'];
 
 const EMPTY_FORM = {
     name: '',
     category: 'ring',
+    customCategory: '',
     description: '',
+    metalType: 'gold',
     goldType: '22K',
+    silverPurity: '925',
     weightInGrams: '',
     makingCharge: '',
     wastageInGrams: '',
@@ -33,6 +36,7 @@ export default function AdminPanel() {
     const [orders, setOrders] = useState([]);
     const [sellRequests, setSellRequests] = useState([]);
     const [goldRates, setGoldRates] = useState(null);
+    const [silverRates, setSilverRates] = useState(null);
     const [loading, setLoading] = useState(true);
 
     // Product form
@@ -45,6 +49,9 @@ export default function AdminPanel() {
     // Gold rate form
     const [rate24k, setRate24k] = useState('');
     const [rate22k, setRate22k] = useState('');
+    // Silver rate form
+    const [rateSilver999, setRateSilver999] = useState('');
+    const [rateSilver925, setRateSilver925] = useState('');
 
     useEffect(() => {
         loadData();
@@ -53,19 +60,25 @@ export default function AdminPanel() {
     async function loadData() {
         setLoading(true);
         try {
-            const [prods, ords, sellReqs, rates] = await Promise.all([
+            const [prods, ords, sellReqs, gRates, sRates] = await Promise.all([
                 getAllProducts(),
                 getAllOrders(),
                 getAllSellRequests(),
-                getStoredGoldRates()
+                getStoredGoldRates(),
+                getStoredSilverRates()
             ]);
             setProducts(prods);
             setOrders(ords.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)));
             setSellRequests(sellReqs.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)));
-            setGoldRates(rates);
-            if (rates) {
-                setRate24k(rates['24k'] || '');
-                setRate22k(rates['22k'] || '');
+            setGoldRates(gRates);
+            setSilverRates(sRates);
+            if (gRates) {
+                setRate24k(gRates['24k'] || '');
+                setRate22k(gRates['22k'] || '');
+            }
+            if (sRates) {
+                setRateSilver999(sRates['999'] || '');
+                setRateSilver925(sRates['925'] || '');
             }
         } catch (error) {
             console.error('Error loading admin data:', error);
@@ -108,9 +121,11 @@ export default function AdminPanel() {
 
             const productData = {
                 name: form.name,
-                category: form.category,
+                category: form.category === 'others' ? (form.customCategory.trim().toLowerCase() || 'others') : form.category,
                 description: form.description,
-                goldType: form.goldType,
+                metalType: form.metalType,
+                goldType: form.metalType === 'gold' ? form.goldType : '',
+                silverPurity: form.metalType === 'silver' ? form.silverPurity : '',
                 weightInGrams: parseFloat(form.weightInGrams) || 0,
                 makingCharge: parseFloat(form.makingCharge) || 0,
                 wastageInGrams: parseFloat(form.wastageInGrams) || 0,
@@ -142,11 +157,15 @@ export default function AdminPanel() {
 
     // Edit product
     const handleEdit = (product) => {
+        const isStandardCat = CATEGORIES.includes(product.category);
         setForm({
             name: product.name || '',
-            category: product.category || 'ring',
+            category: isStandardCat ? product.category : 'others',
+            customCategory: isStandardCat ? '' : (product.category || ''),
             description: product.description || '',
+            metalType: product.metalType || 'gold',
             goldType: product.goldType || '22K',
+            silverPurity: product.silverPurity || '925',
             weightInGrams: product.weightInGrams || '',
             makingCharge: product.makingCharge || '',
             wastageInGrams: product.wastageInGrams || '',
@@ -242,8 +261,8 @@ export default function AdminPanel() {
                     <button className={activeTab === 'sellRequests' ? 'active' : ''} onClick={() => setActiveTab('sellRequests')}>
                         <GiGoldBar style={{ marginRight: 6 }} /> Sell Requests
                     </button>
-                    <button className={activeTab === 'goldRates' ? 'active' : ''} onClick={() => setActiveTab('goldRates')}>
-                        <FiDollarSign style={{ marginRight: 6 }} /> Gold Rates
+                    <button className={activeTab === 'rates' ? 'active' : ''} onClick={() => setActiveTab('rates')}>
+                        <FiDollarSign style={{ marginRight: 6 }} /> Rates
                     </button>
                 </div>
 
@@ -261,20 +280,54 @@ export default function AdminPanel() {
 
                                     <div className="form-group">
                                         <label>Category</label>
-                                        <select name="category" value={form.category} onChange={handleChange}>
+                                        <select name="category" value={CATEGORIES.includes(form.category) ? form.category : 'others'} onChange={(e) => {
+                                            setForm({ ...form, category: e.target.value, customCategory: e.target.value === 'others' ? form.customCategory : '' });
+                                        }}>
                                             {CATEGORIES.map(c => (
                                                 <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
                                             ))}
                                         </select>
                                     </div>
 
+                                    {(form.category === 'others' || !CATEGORIES.includes(form.category)) && (
+                                        <div className="form-group">
+                                            <label>Custom Category Name *</label>
+                                            <input
+                                                type="text"
+                                                name="customCategory"
+                                                value={form.customCategory}
+                                                onChange={handleChange}
+                                                placeholder="e.g. Anklet, Brooch, Hair Pin..."
+                                                required
+                                            />
+                                        </div>
+                                    )}
+
                                     <div className="form-group">
-                                        <label>Gold Type</label>
-                                        <select name="goldType" value={form.goldType} onChange={handleChange}>
-                                            <option value="22K">22K</option>
-                                            <option value="24K">24K</option>
+                                        <label>Metal Type</label>
+                                        <select name="metalType" value={form.metalType} onChange={handleChange}>
+                                            <option value="gold">Gold</option>
+                                            <option value="silver">Silver</option>
                                         </select>
                                     </div>
+
+                                    {form.metalType === 'gold' ? (
+                                        <div className="form-group">
+                                            <label>Gold Purity</label>
+                                            <select name="goldType" value={form.goldType} onChange={handleChange}>
+                                                <option value="22K">22K</option>
+                                                <option value="24K">24K</option>
+                                            </select>
+                                        </div>
+                                    ) : (
+                                        <div className="form-group">
+                                            <label>Silver Purity</label>
+                                            <select name="silverPurity" value={form.silverPurity} onChange={handleChange}>
+                                                <option value="925">925 Sterling</option>
+                                                <option value="999">999 Fine</option>
+                                            </select>
+                                        </div>
+                                    )}
 
                                     <div className="form-group">
                                         <label>Weight (grams) *</label>
@@ -350,7 +403,8 @@ export default function AdminPanel() {
                                             <th>Image</th>
                                             <th>Name</th>
                                             <th>Category</th>
-                                            <th>Gold</th>
+                                            <th>Metal</th>
+                                            <th>Purity</th>
                                             <th>Weight</th>
                                             <th>Actions</th>
                                         </tr>
@@ -369,7 +423,8 @@ export default function AdminPanel() {
                                                 </td>
                                                 <td><strong>{product.name}</strong></td>
                                                 <td style={{ textTransform: 'capitalize' }}>{product.category}</td>
-                                                <td><span className="badge badge-gold">{product.goldType}</span></td>
+                                                <td><span className={`badge ${product.metalType === 'silver' ? 'badge-silver' : 'badge-gold'}`}>{product.metalType === 'silver' ? 'Silver' : 'Gold'}</span></td>
+                                                <td>{product.metalType === 'silver' ? (product.silverPurity === '999' ? '999 Fine' : '925') : (product.goldType || '22K')}</td>
                                                 <td>{product.weightInGrams}g</td>
                                                 <td>
                                                     <div className="actions">
@@ -385,7 +440,7 @@ export default function AdminPanel() {
                                         ))}
                                         {products.length === 0 && (
                                             <tr>
-                                                <td colSpan="6" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                                                <td colSpan="7" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
                                                     No products yet. Add your first product above.
                                                 </td>
                                             </tr>
@@ -441,50 +496,76 @@ export default function AdminPanel() {
                     </div>
                 )}
 
-                {/* Gold Rates Tab */}
-                {activeTab === 'goldRates' && (
-                    <div className="admin-card">
-                        <h3>⚡ Manual Gold Rate Override</h3>
-                        <p style={{ color: 'var(--text-secondary)', marginBottom: '24px', fontSize: '0.9rem' }}>
-                            Override the live gold rates with manual values. This will change pricing for all products.
-                        </p>
-                        <div className="gold-rate-form">
-                            <div className="form-group">
-                                <label>24K Rate (₹/gram)</label>
-                                <input
-                                    type="number"
-                                    value={rate24k}
-                                    onChange={(e) => setRate24k(e.target.value)}
-                                    placeholder="e.g. 7200"
-                                />
+                {/* Rates Tab */}
+                {activeTab === 'rates' && (
+                    <>
+                        <div className="admin-card">
+                            <h3>🥇 Gold Rate Override</h3>
+                            <p style={{ color: 'var(--text-secondary)', marginBottom: '24px', fontSize: '0.9rem' }}>
+                                Override the live gold rates. This changes pricing for all gold products.
+                            </p>
+                            <div className="gold-rate-form">
+                                <div className="form-group">
+                                    <label>24K Rate (₹/gram)</label>
+                                    <input type="number" value={rate24k} onChange={(e) => setRate24k(e.target.value)} placeholder="e.g. 7200" />
+                                </div>
+                                <div className="form-group">
+                                    <label>22K Rate (₹/gram)</label>
+                                    <input type="number" value={rate22k} onChange={(e) => setRate22k(e.target.value)} placeholder="e.g. 6600" />
+                                </div>
+                                <button className="btn btn-primary" onClick={handleUpdateRates}>
+                                    <FiSave /> Update Gold Rates
+                                </button>
                             </div>
-                            <div className="form-group">
-                                <label>22K Rate (₹/gram)</label>
-                                <input
-                                    type="number"
-                                    value={rate22k}
-                                    onChange={(e) => setRate22k(e.target.value)}
-                                    placeholder="e.g. 6600"
-                                />
-                            </div>
-                            <button className="btn btn-primary" onClick={handleUpdateRates}>
-                                <FiSave /> Update Rates
-                            </button>
+                            {goldRates && (
+                                <div style={{ marginTop: '24px', padding: '16px', background: 'var(--light-gray)', borderRadius: 'var(--radius-sm)' }}>
+                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Current gold rates:</div>
+                                    <div style={{ fontWeight: 600, marginTop: '4px' }}>
+                                        24K: ₹{goldRates['24k']?.toLocaleString('en-IN')}/g • 22K: ₹{goldRates['22k']?.toLocaleString('en-IN')}/g
+                                    </div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                        Last updated: {goldRates.lastUpdated ? new Date(goldRates.lastUpdated).toLocaleString('en-IN') : 'N/A'}
+                                        {goldRates.manualOverride && ' (Manual Override)'}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
-                        {goldRates && (
-                            <div style={{ marginTop: '24px', padding: '16px', background: 'var(--light-gray)', borderRadius: 'var(--radius-sm)' }}>
-                                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Current rates in database:</div>
-                                <div style={{ fontWeight: 600, marginTop: '4px' }}>
-                                    24K: ₹{goldRates['24k']?.toLocaleString('en-IN')}/g  •  22K: ₹{goldRates['22k']?.toLocaleString('en-IN')}/g
+                        <div className="admin-card" style={{ marginTop: '24px' }}>
+                            <h3>🥈 Silver Rate Management</h3>
+                            <p style={{ color: 'var(--text-secondary)', marginBottom: '24px', fontSize: '0.9rem' }}>
+                                Set silver rates manually. These are used for all silver product pricing.
+                            </p>
+                            <div className="gold-rate-form">
+                                <div className="form-group">
+                                    <label>999 Fine Silver (₹/gram)</label>
+                                    <input type="number" value={rateSilver999} onChange={(e) => setRateSilver999(e.target.value)} placeholder="e.g. 95" />
                                 </div>
-                                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                                    Last updated: {goldRates.lastUpdated ? new Date(goldRates.lastUpdated).toLocaleString('en-IN') : 'N/A'}
-                                    {goldRates.manualOverride && ' (Manual Override)'}
+                                <div className="form-group">
+                                    <label>925 Sterling Silver (₹/gram)</label>
+                                    <input type="number" value={rateSilver925} onChange={(e) => setRateSilver925(e.target.value)} placeholder="e.g. 85" />
                                 </div>
+                                <button className="btn btn-primary" onClick={async () => {
+                                    if (!rateSilver999 || !rateSilver925) { toast.error('Enter both silver rates'); return; }
+                                    try {
+                                        await setManualSilverRates(rateSilver999, rateSilver925);
+                                        toast.success('Silver rates updated!');
+                                        await loadData();
+                                    } catch (err) { toast.error('Failed to update silver rates'); }
+                                }}>
+                                    <FiSave /> Update Silver Rates
+                                </button>
                             </div>
-                        )}
-                    </div>
+                            {silverRates && (
+                                <div style={{ marginTop: '24px', padding: '16px', background: 'var(--light-gray)', borderRadius: 'var(--radius-sm)' }}>
+                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Current silver rates:</div>
+                                    <div style={{ fontWeight: 600, marginTop: '4px' }}>
+                                        999: ₹{silverRates['999']?.toLocaleString('en-IN')}/g • 925: ₹{silverRates['925']?.toLocaleString('en-IN')}/g
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </>
                 )}
             </div>
         </div>

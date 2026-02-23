@@ -187,13 +187,59 @@ export async function clearManualOverride() {
     return await fetchLiveGoldRates();
 }
 
+// ============================================
+// SILVER RATE MANAGEMENT (Admin-only, no API)
+// ============================================
+
+/** Get stored silver rates from Firebase */
+export async function getStoredSilverRates() {
+    try {
+        const snapshot = await get(ref(database, 'silverRates'));
+        return snapshot.exists() ? snapshot.val() : null;
+    } catch (error) {
+        console.error('Failed to get silver rates:', error);
+        return null;
+    }
+}
+
+/** Admin: set silver rate per gram */
+export async function setManualSilverRates(rate999, rate925) {
+    const rates = {
+        '999': Number(rate999),
+        '925': Number(rate925),
+        lastUpdated: Date.now(),
+        source: 'admin-manual'
+    };
+    try {
+        await set(ref(database, 'silverRates'), rates);
+    } catch (error) {
+        console.error('Failed to save silver rates:', error);
+    }
+    return rates;
+}
+
 /**
- * Calculate jewelry price
- * Formula: (goldRate × (weight + wastage)) + makingCharge + tax%
+ * Calculate jewelry price (works for both gold & silver)
+ * Formula: (metalRate × (weight + wastage)) + makingCharge + tax%
  */
-export function calculateJewelryPrice(goldRate, weightInGrams, wastageInGrams, makingCharge, taxPercentage) {
-    const goldCost = goldRate * (weightInGrams + wastageInGrams);
-    const subtotal = goldCost + makingCharge;
+export function calculateJewelryPrice(metalRate, weightInGrams, wastageInGrams, makingCharge, taxPercentage) {
+    const metalCost = metalRate * (weightInGrams + wastageInGrams);
+    const subtotal = metalCost + makingCharge;
     const tax = (subtotal * taxPercentage) / 100;
     return Math.round(subtotal + tax);
 }
+
+/**
+ * Helper: get the correct rate for a product based on its metal type and purity
+ */
+export function getProductRate(product, goldRates, silverRates) {
+    if (product.metalType === 'silver') {
+        const purity = product.silverPurity || '925';
+        return silverRates?.[purity] || 0;
+    }
+    // Default: gold
+    return product.goldType === '24K'
+        ? (goldRates?.['24k'] || 0)
+        : (goldRates?.['22k'] || 0);
+}
+

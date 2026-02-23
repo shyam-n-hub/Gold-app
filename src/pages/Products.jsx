@@ -1,38 +1,42 @@
 // ============================================
-// Products Listing Page
+// Products Listing Page (Gold + Silver)
 // ============================================
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { IoDiamondOutline } from 'react-icons/io5';
 import { FiSearch } from 'react-icons/fi';
 import ProductCard from '../components/ProductCard';
-import { fetchLiveGoldRates, calculateJewelryPrice } from '../services/goldRateService';
+import { fetchLiveGoldRates, getStoredSilverRates, calculateJewelryPrice, getProductRate } from '../services/goldRateService';
 import { getAllProducts } from '../services/productService';
 import '../styles/Products.css';
 
 const CATEGORIES = ['all', 'ring', 'chain', 'necklace', 'bangle', 'earring', 'pendant', 'bracelet'];
-const GOLD_TYPES = ['all', '22K', '24K'];
+const METAL_TYPES = ['all', 'gold', 'silver'];
 
 export default function Products() {
     const [searchParams] = useSearchParams();
     const initialCategory = searchParams.get('category') || 'all';
+    const initialMetal = searchParams.get('metal') || 'all';
 
     const [products, setProducts] = useState([]);
     const [goldRates, setGoldRates] = useState(null);
+    const [silverRates, setSilverRates] = useState(null);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [category, setCategory] = useState(initialCategory);
-    const [goldType, setGoldType] = useState('all');
+    const [metalType, setMetalType] = useState(initialMetal);
     const [sortBy, setSortBy] = useState('newest');
 
     useEffect(() => {
         async function loadData() {
             try {
-                const [rates, prods] = await Promise.all([
+                const [gRates, sRates, prods] = await Promise.all([
                     fetchLiveGoldRates(),
+                    getStoredSilverRates(),
                     getAllProducts()
                 ]);
-                setGoldRates(rates);
+                setGoldRates(gRates);
+                setSilverRates(sRates);
                 setProducts(prods);
             } catch (error) {
                 console.error('Error loading products:', error);
@@ -43,10 +47,12 @@ export default function Products() {
         loadData();
     }, []);
 
-    // Update category from URL params
+    // Update filters from URL params
     useEffect(() => {
         const cat = searchParams.get('category');
         if (cat) setCategory(cat);
+        const metal = searchParams.get('metal');
+        if (metal) setMetalType(metal);
     }, [searchParams]);
 
     const filteredProducts = useMemo(() => {
@@ -67,27 +73,22 @@ export default function Products() {
             filtered = filtered.filter(p => p.category === category);
         }
 
-        // Gold type filter
-        if (goldType !== 'all') {
-            filtered = filtered.filter(p => p.goldType === goldType);
+        // Metal type filter
+        if (metalType !== 'all') {
+            filtered = filtered.filter(p => {
+                const pMetal = p.metalType || 'gold'; // default to gold for backward compat
+                return pMetal === metalType;
+            });
         }
 
         // Sort
-        if (sortBy === 'price-low') {
+        if (sortBy === 'price-low' || sortBy === 'price-high') {
             filtered.sort((a, b) => {
-                const rateA = a.goldType === '24K' ? goldRates?.['24k'] || 0 : goldRates?.['22k'] || 0;
-                const rateB = b.goldType === '24K' ? goldRates?.['24k'] || 0 : goldRates?.['22k'] || 0;
+                const rateA = getProductRate(a, goldRates, silverRates);
+                const rateB = getProductRate(b, goldRates, silverRates);
                 const priceA = calculateJewelryPrice(rateA, a.weightInGrams || 0, a.wastageInGrams || 0, a.makingCharge || 0, a.taxPercentage || 0);
                 const priceB = calculateJewelryPrice(rateB, b.weightInGrams || 0, b.wastageInGrams || 0, b.makingCharge || 0, b.taxPercentage || 0);
-                return priceA - priceB;
-            });
-        } else if (sortBy === 'price-high') {
-            filtered.sort((a, b) => {
-                const rateA = a.goldType === '24K' ? goldRates?.['24k'] || 0 : goldRates?.['22k'] || 0;
-                const rateB = b.goldType === '24K' ? goldRates?.['24k'] || 0 : goldRates?.['22k'] || 0;
-                const priceA = calculateJewelryPrice(rateA, a.weightInGrams || 0, a.wastageInGrams || 0, a.makingCharge || 0, a.taxPercentage || 0);
-                const priceB = calculateJewelryPrice(rateB, b.weightInGrams || 0, b.wastageInGrams || 0, b.makingCharge || 0, b.taxPercentage || 0);
-                return priceB - priceA;
+                return sortBy === 'price-low' ? priceA - priceB : priceB - priceA;
             });
         } else if (sortBy === 'weight') {
             filtered.sort((a, b) => (a.weightInGrams || 0) - (b.weightInGrams || 0));
@@ -97,14 +98,14 @@ export default function Products() {
         }
 
         return filtered;
-    }, [products, search, category, goldType, sortBy, goldRates]);
+    }, [products, search, category, metalType, sortBy, goldRates, silverRates]);
 
     return (
         <div className="products-page">
             <div className="container">
                 <div className="page-header">
                     <h1>Our Collection</h1>
-                    <p>Discover exquisite gold jewelry crafted with perfection</p>
+                    <p>Discover exquisite gold & silver jewelry crafted with perfection</p>
                 </div>
 
                 {/* Filters */}
@@ -129,10 +130,10 @@ export default function Products() {
                         ))}
                     </select>
 
-                    <select value={goldType} onChange={(e) => setGoldType(e.target.value)}>
-                        {GOLD_TYPES.map(g => (
-                            <option key={g} value={g}>
-                                {g === 'all' ? 'All Gold Types' : g}
+                    <select value={metalType} onChange={(e) => setMetalType(e.target.value)}>
+                        {METAL_TYPES.map(m => (
+                            <option key={m} value={m}>
+                                {m === 'all' ? 'All Metals' : m.charAt(0).toUpperCase() + m.slice(1)}
                             </option>
                         ))}
                     </select>
@@ -159,6 +160,7 @@ export default function Products() {
                                 key={product.id}
                                 product={product}
                                 goldRates={goldRates}
+                                silverRates={silverRates}
                             />
                         ))}
                     </div>

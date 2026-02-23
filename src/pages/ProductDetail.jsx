@@ -1,5 +1,5 @@
 // ============================================
-// Product Details Page
+// Product Details Page (Gold + Silver)
 // ============================================
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
@@ -7,7 +7,7 @@ import { FiShoppingCart, FiArrowLeft } from 'react-icons/fi';
 import { IoDiamondOutline } from 'react-icons/io5';
 import { useCart } from '../context/CartContext';
 import { getProductById } from '../services/productService';
-import { fetchLiveGoldRates, calculateJewelryPrice } from '../services/goldRateService';
+import { fetchLiveGoldRates, getStoredSilverRates, calculateJewelryPrice, getProductRate } from '../services/goldRateService';
 import toast from 'react-hot-toast';
 import '../styles/ProductDetail.css';
 
@@ -16,17 +16,20 @@ export default function ProductDetail() {
     const { addToCart } = useCart();
     const [product, setProduct] = useState(null);
     const [goldRates, setGoldRates] = useState(null);
+    const [silverRates, setSilverRates] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         async function loadProduct() {
             try {
-                const [prod, rates] = await Promise.all([
+                const [prod, gRates, sRates] = await Promise.all([
                     getProductById(id),
-                    fetchLiveGoldRates()
+                    fetchLiveGoldRates(),
+                    getStoredSilverRates()
                 ]);
                 setProduct(prod);
-                setGoldRates(rates);
+                setGoldRates(gRates);
+                setSilverRates(sRates);
             } catch (error) {
                 console.error('Error loading product:', error);
             } finally {
@@ -55,14 +58,18 @@ export default function ProductDetail() {
         );
     }
 
-    const goldRate = product.goldType === '24K'
-        ? (goldRates?.['24k'] || 0)
-        : (goldRates?.['22k'] || 0);
+    const isGold = product.metalType !== 'silver';
+    const metalRate = getProductRate(product, goldRates, silverRates);
 
-    const goldCost = goldRate * ((product.weightInGrams || 0) + (product.wastageInGrams || 0));
-    const subtotal = goldCost + (product.makingCharge || 0);
+    const metalCost = metalRate * ((product.weightInGrams || 0) + (product.wastageInGrams || 0));
+    const subtotal = metalCost + (product.makingCharge || 0);
     const tax = (subtotal * (product.taxPercentage || 0)) / 100;
     const finalPrice = Math.round(subtotal + tax);
+
+    const metalLabel = isGold ? 'Gold' : 'Silver';
+    const purityLabel = isGold
+        ? (product.goldType || '22K')
+        : (product.silverPurity === '999' ? '999 Fine Silver' : '925 Sterling Silver');
 
     const handleAddToCart = () => {
         addToCart(product, finalPrice);
@@ -98,9 +105,14 @@ export default function ProductDetail() {
                         </div>
 
                         <h1>{product.name}</h1>
-                        <span className="badge badge-gold gold-type-badge">{product.goldType}</span>
+                        <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                            <span className={`badge ${isGold ? 'badge-gold' : 'badge-silver'} gold-type-badge`}>
+                                {isGold ? '🥇 Gold' : '🥈 Silver'}
+                            </span>
+                            <span className="badge badge-gold gold-type-badge">{purityLabel}</span>
+                        </div>
 
-                        <p className="description">{product.description || 'A beautiful piece of gold jewelry crafted with precision and care.'}</p>
+                        <p className="description">{product.description || `A beautiful piece of ${metalLabel.toLowerCase()} jewelry crafted with precision and care.`}</p>
 
                         {/* Specs */}
                         <div className="specs-grid">
@@ -109,8 +121,12 @@ export default function ProductDetail() {
                                 <div className="value">{product.weightInGrams}g</div>
                             </div>
                             <div className="spec-item">
-                                <div className="label">Gold Type</div>
-                                <div className="value">{product.goldType}</div>
+                                <div className="label">Metal</div>
+                                <div className="value">{metalLabel}</div>
+                            </div>
+                            <div className="spec-item">
+                                <div className="label">Purity</div>
+                                <div className="value">{purityLabel}</div>
                             </div>
                             <div className="spec-item">
                                 <div className="label">Category</div>
@@ -126,16 +142,16 @@ export default function ProductDetail() {
                         <div className="price-breakdown">
                             <h3>Price Breakdown</h3>
                             <div className="price-row">
-                                <span>Gold Rate ({product.goldType})</span>
-                                <span>₹{goldRate.toLocaleString('en-IN')}/g</span>
+                                <span>{metalLabel} Rate ({purityLabel})</span>
+                                <span>₹{metalRate.toLocaleString('en-IN')}/g</span>
                             </div>
                             <div className="price-row">
                                 <span>Weight + Wastage</span>
                                 <span>{product.weightInGrams}g + {product.wastageInGrams}g = {(product.weightInGrams + product.wastageInGrams).toFixed(2)}g</span>
                             </div>
                             <div className="price-row">
-                                <span>Gold Cost</span>
-                                <span>₹{Math.round(goldCost).toLocaleString('en-IN')}</span>
+                                <span>{metalLabel} Cost</span>
+                                <span>₹{Math.round(metalCost).toLocaleString('en-IN')}</span>
                             </div>
                             <div className="price-row">
                                 <span>Making Charge</span>

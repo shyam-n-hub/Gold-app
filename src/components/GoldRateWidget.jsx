@@ -1,5 +1,5 @@
 // ============================================
-// Gold Rate Widget Component
+// Rate Widget Component (Gold + Silver)
 // ============================================
 import React from 'react';
 
@@ -15,9 +15,14 @@ const rateCardStyle = {
     padding: '20px 28px',
     color: '#fff',
     flex: '1',
-    minWidth: '180px',
+    minWidth: '150px',
     position: 'relative',
     overflow: 'hidden'
+};
+
+const silverCardStyle = {
+    ...rateCardStyle,
+    background: 'linear-gradient(135deg, #2D2D3D 0%, #3D3D4D 100%)'
 };
 
 const shimmerOverlay = {
@@ -30,60 +35,81 @@ const shimmerOverlay = {
     pointerEvents: 'none'
 };
 
-export default function GoldRateWidget({ goldRates, compact = false }) {
-    if (!goldRates) return null;
+const silverShimmerOverlay = {
+    ...shimmerOverlay,
+    background: 'linear-gradient(135deg, transparent 0%, rgba(192,192,192,0.08) 50%, transparent 100%)'
+};
 
+export default function GoldRateWidget({ goldRates, silverRates, compact }) {
     const formatRate = (rate) => {
-        return rate ? `₹${Number(rate).toLocaleString('en-IN')}` : '—';
+        if (!rate || rate === 0) return '—';
+        return `₹${Number(rate).toLocaleString('en-IN')}`;
     };
 
-    const lastUpdated = goldRates.lastUpdated
+    const lastUpdated = goldRates?.lastUpdated
         ? new Date(goldRates.lastUpdated).toLocaleTimeString('en-IN', {
-            hour: '2-digit',
-            minute: '2-digit'
+            hour: '2-digit', minute: '2-digit'
         })
-        : '';
+        : null;
 
     if (compact) {
         return (
-            <div style={{ display: 'flex', gap: '16px', alignItems: 'center', fontSize: '0.85rem' }}>
-                <span style={{ color: '#B76E79', fontWeight: 600 }}>
-                    24K: {formatRate(goldRates['24k'])}/g
-                </span>
-                <span style={{ color: '#999' }}>|</span>
-                <span style={{ color: '#B76E79', fontWeight: 600 }}>
-                    22K: {formatRate(goldRates['22k'])}/g
-                </span>
+            <div style={{ display: 'flex', gap: '12px', fontSize: '0.85rem', flexWrap: 'wrap' }}>
+                <span>🥇 24K: <strong>{formatRate(goldRates?.['24k'])}</strong>/g</span>
+                <span>22K: <strong>{formatRate(goldRates?.['22k'])}</strong>/g</span>
+                {silverRates && (
+                    <span>🥈 Silver: <strong>{formatRate(silverRates?.['925'])}</strong>/g</span>
+                )}
             </div>
         );
     }
 
     return (
-        <div style={widgetStyle}>
-            <div style={rateCardStyle}>
-                <div style={shimmerOverlay} />
-                <div style={{ position: 'relative', zIndex: 1 }}>
-                    <div style={{ fontSize: '0.8rem', opacity: 0.7, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                        24K Gold
-                    </div>
-                    <div style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.6rem', fontWeight: 700, color: '#E8C99B' }}>
-                        {formatRate(goldRates['24k'])}
-                    </div>
-                    <div style={{ fontSize: '0.75rem', opacity: 0.5, marginTop: '4px' }}>per gram</div>
-                </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
+            <div style={{ whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: '1.1rem', fontWeight: 700, fontFamily: 'var(--font-display)' }}>
+                    📊 Live Rates (India)
+                </span>
             </div>
 
-            <div style={rateCardStyle}>
-                <div style={shimmerOverlay} />
-                <div style={{ position: 'relative', zIndex: 1 }}>
-                    <div style={{ fontSize: '0.8rem', opacity: 0.7, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+            <div style={{ ...widgetStyle, flex: 1 }}>
+                {/* Gold 24K */}
+                <div style={rateCardStyle}>
+                    <div style={shimmerOverlay} />
+                    <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '1px', color: '#C9A96E', marginBottom: '6px' }}>
+                        24K Gold
+                    </div>
+                    <div style={{ fontSize: '1.5rem', fontFamily: 'var(--font-display)', fontWeight: 700, color: '#C9A96E' }}>
+                        {formatRate(goldRates?.['24k'])}
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: '#888' }}>per gram</div>
+                </div>
+
+                {/* Gold 22K */}
+                <div style={rateCardStyle}>
+                    <div style={shimmerOverlay} />
+                    <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '1px', color: '#C9A96E', marginBottom: '6px' }}>
                         22K Gold
                     </div>
-                    <div style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.6rem', fontWeight: 700, color: '#E8C99B' }}>
-                        {formatRate(goldRates['22k'])}
+                    <div style={{ fontSize: '1.5rem', fontFamily: 'var(--font-display)', fontWeight: 700, color: '#C9A96E' }}>
+                        {formatRate(goldRates?.['22k'])}
                     </div>
-                    <div style={{ fontSize: '0.75rem', opacity: 0.5, marginTop: '4px' }}>per gram</div>
+                    <div style={{ fontSize: '0.72rem', color: '#888' }}>per gram</div>
                 </div>
+
+                {/* Silver 925 */}
+                {silverRates && (
+                    <div style={silverCardStyle}>
+                        <div style={silverShimmerOverlay} />
+                        <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '1px', color: '#C0C0C0', marginBottom: '6px' }}>
+                            925 Silver
+                        </div>
+                        <div style={{ fontSize: '1.5rem', fontFamily: 'var(--font-display)', fontWeight: 700, color: '#C0C0C0' }}>
+                            {formatRate(silverRates?.['925'])}
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: '#888' }}>per gram</div>
+                    </div>
+                )}
             </div>
 
             {lastUpdated && (

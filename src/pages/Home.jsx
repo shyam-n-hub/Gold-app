@@ -1,5 +1,5 @@
 // ============================================
-// Home Page Component
+// Home Page Component (Gold + Silver)
 // ============================================
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
@@ -8,7 +8,7 @@ import { GiDiamondRing, GiDoubleNecklace, GiCrystalEarrings } from 'react-icons/
 import { FiArrowRight } from 'react-icons/fi';
 import ProductCard from '../components/ProductCard';
 import GoldRateWidget from '../components/GoldRateWidget';
-import { fetchLiveGoldRates } from '../services/goldRateService';
+import { fetchLiveGoldRates, getStoredSilverRates } from '../services/goldRateService';
 import { getAllProducts } from '../services/productService';
 import '../styles/Home.css';
 
@@ -22,17 +22,20 @@ const CATEGORIES = [
 
 export default function Home() {
     const [goldRates, setGoldRates] = useState(null);
+    const [silverRates, setSilverRates] = useState(null);
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         async function loadData() {
             try {
-                const [rates, prods] = await Promise.all([
+                const [gRates, sRates, prods] = await Promise.all([
                     fetchLiveGoldRates(),
+                    getStoredSilverRates(),
                     getAllProducts()
                 ]);
-                setGoldRates(rates);
+                setGoldRates(gRates);
+                setSilverRates(sRates);
                 setProducts(prods);
             } catch (error) {
                 console.error('Error loading home data:', error);
@@ -45,10 +48,14 @@ export default function Home() {
         // Auto-refresh gold rates every 10 minutes
         const interval = setInterval(async () => {
             try {
-                const rates = await fetchLiveGoldRates();
+                const [rates, sRates] = await Promise.all([
+                    fetchLiveGoldRates(),
+                    getStoredSilverRates()
+                ]);
                 setGoldRates(rates);
+                setSilverRates(sRates);
             } catch (err) {
-                console.warn('Gold rate refresh failed');
+                console.warn('Rate refresh failed');
             }
         }, 10 * 60 * 1000);
 
@@ -66,10 +73,10 @@ export default function Home() {
                         <span className="tagline">✦ Premium Jewelry Since 1990</span>
                         <h1>
                             Timeless <span className="highlight">Elegance</span> Crafted
-                            in Pure Gold
+                            in Gold & Silver
                         </h1>
                         <p>
-                            Discover our exquisite collection of handcrafted 22K and 24K gold
+                            Discover our exquisite collection of handcrafted gold and silver
                             jewelry. Every piece tells a story of tradition, artistry, and
                             unmatched quality.
                         </p>
@@ -78,7 +85,7 @@ export default function Home() {
                                 Explore Collection <FiArrowRight />
                             </Link>
                             <Link to="/sell-gold" className="btn btn-outline btn-lg" style={{ borderColor: '#fff', color: '#fff' }}>
-                                Sell Gold
+                                Sell Gold & Silver
                             </Link>
                         </div>
                     </div>
@@ -90,13 +97,10 @@ export default function Home() {
                 </div>
             </section>
 
-            {/* Live Gold Rates */}
+            {/* Live Rates */}
             <section className="gold-rates-section">
                 <div className="container">
-                    <h3>📊 Live Gold Rates (India)</h3>
-                    <div style={{ flex: 1 }}>
-                        <GoldRateWidget goldRates={goldRates} />
-                    </div>
+                    <GoldRateWidget goldRates={goldRates} silverRates={silverRates} />
                 </div>
             </section>
 
@@ -106,7 +110,7 @@ export default function Home() {
                     <div className="section-title">
                         <div className="divider"></div>
                         <h2>Shop by Category</h2>
-                        <p>Explore our curated collections of fine gold jewelry</p>
+                        <p>Explore our curated collections of fine jewelry</p>
                     </div>
                     <div className="categories-grid">
                         {CATEGORIES.map((cat) => (
@@ -144,6 +148,7 @@ export default function Home() {
                                         key={product.id}
                                         product={product}
                                         goldRates={goldRates}
+                                        silverRates={silverRates}
                                     />
                                 ))}
                             </div>
@@ -165,10 +170,10 @@ export default function Home() {
             {/* CTA */}
             <section className="cta-section">
                 <div className="container">
-                    <h2>Have Old Gold to Sell?</h2>
-                    <p>Get the best value for your gold with our transparent HUID-based pricing</p>
+                    <h2>Have Old Gold or Silver to Sell?</h2>
+                    <p>Get the best value for your precious metals with our transparent HUID-based pricing</p>
                     <Link to="/sell-gold" className="btn btn-gold btn-lg">
-                        Sell Your Gold <FiArrowRight />
+                        Sell Your Gold & Silver <FiArrowRight />
                     </Link>
                 </div>
             </section>
